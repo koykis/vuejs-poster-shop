@@ -1,17 +1,45 @@
 var PRICE = 4.99;
+var LOAD_NUM = 10;
 
 new Vue({
 	el: '#app',
 	data: {
 		total: 0,
-		items: [
-			{ id: 1, title: 'Mpiftekia' },
-			{ id: 2, title: 'Souvlakia' },
-			{ id: 3, title: 'Mprizoles' }
-		],
-		cart: []
+		items: [],
+		cart: [],
+		results: [],
+		search: 'anime',
+		lastSearch: '',
+		loading: false,
+		price: PRICE
+	},
+	computed: {
+		noMoreItems: function() {
+			return this.items.length === this.results.length && this.results.length > 0;
+		}
 	},
 	methods: {
+		appendItems: function() {
+			if(this.items.length < this.results.length) {
+				var append = this.results.slice(this.items.length, this.items.length + LOAD_NUM);
+				this.items = this.items.concat(append);
+			}
+		},
+		onSubmit: function() {
+			if(this.search.length != 0){
+				this.items = [];
+				var subURI = '/search/'+this.search;
+				this.loading = true;
+				this.$http
+					.get(subURI)
+					.then(function(res) {
+						this.lastSearch = this.search;
+						this.results = res.data;
+						this.appendItems();
+						this.loading = false;
+					});
+			}
+		},
 		addItem: function(index) {
 			this.total += PRICE;
 			var item = this.items[index];
@@ -20,6 +48,7 @@ new Vue({
 				if(this.cart[i].id === item.id){
 					found = true;
 					this.cart[i].qty++;
+					break;
 				}
 			}
 			if(!found){
@@ -30,7 +59,6 @@ new Vue({
 					qty: 1
 				});
 			}
-			//console.log(this.cart.length);
 		},
 		inc: function(item) {
 			item.qty++;
@@ -46,10 +74,12 @@ new Vue({
 		},
 		rem: function (item) {
 			var sure = confirm('Are you sure you want to remove ' + item.title + ' from your cart?');
-			for(var i=0; i <= this.cart.length; i++){
-				if(this.cart[i].id === item.id && sure === true){
-					this.cart.splice(i, 1);
-					this.total = this.total - (PRICE * item.qty);
+			if(sure === true){
+				for(var i=0; i <= this.cart.length; i++){
+					if(this.cart[i].id === item.id){
+						this.cart.splice(i, 1);
+						this.total = this.total - (PRICE * item.qty);
+					}
 				}
 			}
 		}
@@ -58,5 +88,15 @@ new Vue({
 		currency: function(price) {
 			return price.toFixed(2)+'€';
 		}
+	},
+	mounted: function() {
+		this.onSubmit();
+
+		var vueInstance = this;
+		var elem = document.getElementById('product-list-bottom');
+		var watcher = scrollMonitor.create(elem);
+		watcher.enterViewport(function() {
+			vueInstance.appendItems();
+		});
 	}
 });
